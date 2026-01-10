@@ -1,0 +1,29 @@
+name: NAM 3km APCP 12–24 Total
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 13 * * *"   # ~13:30 UTC = after 12z files exist
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install wgrib2
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wgrib2
+
+      - name: Run script
+        run: |
+          python3 nam3km_apcp_12to24_total.py
+
+      - name: Upload output
+        uses: actions/upload-artifact@v4
+        with:
+          name: nam3km_apcp_total
+          path: nam3km_12z_apcp_f12_f24_total.grib2
