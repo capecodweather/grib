@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """
 Download 12z NAM 3km APCP GRIB2 files (f12–f24),
-sum them using xarray/cfgrib, and output NetCDF.
+sum them, and output NetCDF.
 
 Output:
   nam3km_12z_apcp_f12_f24_total.nc
 """
 
-import os
+from datetime import datetime
 from pathlib import Path
 
 import requests
 import xarray as xr
+
+# ---------------- CONFIG ---------------- #
 
 RUN_HOUR = "12"
 START_FH = 12
@@ -24,43 +26,65 @@ WORKDIR.mkdir(exist_ok=True)
 
 OUTFILE = "nam3km_12z_apcp_f12_f24_total.nc"
 
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (compatible; CapeCodWeather/1.0)"
+}
 
-def download_file(url, outpath):
+# --------------------------------------- #
+
+
+def download(url, outpath):
     if outpath.exists():
         return
-    r = requests.get(url, timeout=60)
+
+    r = requests.get(url, headers=HEADERS, timeout=120)
     r.raise_for_status()
     outpath.write_bytes(r.content)
 
 
-datasets = []
+def main():
+    today = datetime.utcnow().strftime("%Y%m%d")
 
-for fh in range(START_FH, END_FH + 1):
-    fh_str = f"{fh:02d}"
-    fname = f"nam.t{RUN_HOUR}z.conusnest.hiresf{fh_str}.tm00.grib2"
-    url = f"{BASE_URL}/nam.{RUN_HOUR}/{fname}"
-    local = WORKDIR / fname
+    datasets = []
 
-    print(f"Downloading {fname}")
-    download_file(url, local)
+    for fh in range(START_FH, END_FH + 1):
+        fh_str = f"{fh:02d}"
 
-    ds = xr.open_dataset(
-        local,
-        engine="cfgrib",
-        filter_by_keys={"shortName": "tp"},
-        backend_kwargs={"indexpath": ""},
+        fname = f"nam.t{RUN_HOUR}z.conusnest.hiresf{fh_str}.tm00.grib2"
+        url = f"{BASE_URL}/nam.{today}/{fname}"
+        local = WORKDIR / fname
+
+        print(f"Downloading {fname}")
+        download(url, local)
+
+        ds = xr.open_dataset(
+            local,
+            engine="cfgrib",
+            filter_by_keys={"shortName": "tp"},
+            backend_kwargs={"indexpath": ""},
+        )
+
+        datasets.append(ds["tp"])
+
+    print("Summing APCP")
+    total = sum(datasets)
+
+    out = total.to_dataset(name="apcp_12_24")
+    out["apcp_12_24"].attrs.update(
+        {
+            "units": "mm",
+            "description": "NAM 3km total precipitation from f12 to f24",
+            "model": "NAM CONUS Nest 3km",
+            "run_hour": "12z",
+        }
     )
 
-    datasets.append(ds)
+    print(f"Writing {OUTFILE}")
+    out.to_netcdf(OUTFILE)
 
-print("Summing precipitation")
-total = sum(ds["tp"] for ds in datasets)
+    print("✅ DONE")
 
-out = total.to_dataset(name="apcp_12_24")
-out["apcp_12_24"].attrs["units"] = "mm"
-out["apcp_12_24"].attrs["description"] = "NAM 3km total precipitation f12–f24"
 
-print(f"Writing {OUTFILE}")
-out.to_netcdf(OUTFILE)
+if __name__ == "__main__":
+    main()
 
-print("✅ DONE")
