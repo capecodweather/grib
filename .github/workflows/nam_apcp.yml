@@ -1,57 +1,29 @@
-name: NAM 3km APCP 12–24 Total
+name: NAM 3km APCP 12–24 Total (NetCDF)
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "30 13 * * *"   # ~13:30 UTC, after 12z NAM is available
+    - cron: "30 13 * * *"
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     steps:
-      # -------------------------------
-      # Checkout your repo
-      # -------------------------------
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # -------------------------------
-      # Install system dependencies
-      # -------------------------------
-      - name: Install build dependencies
+      - name: Install Python deps
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            git \
-            curl \
-            libgomp1
+          python3 -m pip install --upgrade pip
+          pip install xarray cfgrib eccodes requests netcdf4
 
-      # -------------------------------
-      # Build & install wgrib2 (default branch)
-      # -------------------------------
-      - name: Build and install wgrib2
-        run: |
-          git clone https://github.com/NOAA-EMC/wgrib2.git
-          cd wgrib2
-          make
-          sudo cp wgrib2/wgrib2 /usr/local/bin/
-          sudo chmod +x /usr/local/bin/wgrib2
-          wgrib2 -V
-
-      # -------------------------------
-      # Run NAM APCP accumulation script
-      # -------------------------------
-      - name: Run NAM APCP script
+      - name: Run script
         run: |
           python3 nam3km_apcp_12to24_total.py
 
-      # -------------------------------
-      # Upload final GRIB2 output
-      # -------------------------------
       - name: Upload output
         uses: actions/upload-artifact@v4
         with:
           name: nam3km_apcp_total
-          path: nam3km_12z_apcp_f12_f24_total.grib2
+          path: nam3km_12z_apcp_f12_f24_total.nc
