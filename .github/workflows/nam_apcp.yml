@@ -20,7 +20,7 @@ jobs:
 
       - name: Run script
         run: |
-          python3 python3 nam3km_apcp_12to24_cgi.py
+          python3 nam3km_apcp_12to24_cgi.py
 
       - name: Upload output
         uses: actions/upload-artifact@v4
