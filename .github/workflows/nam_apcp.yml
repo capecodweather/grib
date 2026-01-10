@@ -27,3 +27,4 @@ jobs:
         with:
           name: nam3km_apcp_total
           path: nam3km_12z_apcp_f12_f24_total.nc
+          
