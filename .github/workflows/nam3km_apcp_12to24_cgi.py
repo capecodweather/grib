@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""
+NAM 3km APCP f12–f24 via NOMADS CGI filter.
+Outputs NetCDF.
+"""
+
+from datetime import datetime
+from pathlib import Path
+import requests
+import xarray as xr
+
+RUN_HOUR = "12"
+START_FH = 12
+END_FH = 24
+
+BASE_CGI = "https://nomads.ncep.noaa.gov/cgi-bin/filter_nam_conusnest.pl"
+
+WORKDIR = Path("work")
+WORKDIR.mkdir(exist_ok=True)
+
+OUTFILE = "nam3km_12z_apcp_f12_f24_total.nc"
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (CapeCodWeather GitHub Action)"
+}
+
+def download_apcp(run_date, fh):
+    fh_str = f"{fh:02d}"
+    fname = f"nam.t{RUN_HOUR}z.conusnest.hiresf{fh_str}.tm00.grib2"
+
+    params = {
+        "file": fname,
+        "dir": f"/nam.{run_date}",
+        "var_APCP": "on",
+        "lev_surface": "on",
+    }
+
+    outpath = WORKDIR / fname
+    if outpath.exists():
+        return outpath
+
+    print(f"Downloading {fname}")
+    r = requests.get(BASE_CGI, params=params, headers=HEADERS, timeout=120)
+    r.raise_for_status()
+    outpath.write_bytes(r.content)
+
+    return outpath
+
+def main():
+    run_date = datetime.utcnow().strftime("%Y%m%d")
+    arrays = []
+
+    for fh in range(START_FH, END_FH + 1):
+        grib = download_apcp(run_date, fh)
+        ds = xr.open_dataset(
+            grib,
+            engine="cfgrib",
+            backend_kwargs={"indexpath": ""},
+        )
+        arrays.append(ds["tp"])
+
+    total = sum(arrays)
+
+    out = total.to_dataset(name="apcp_12_24")
+    out["apcp_12_24"].attrs.update(
+        units="mm",
+        description="NAM 3km total precipitation f12–f24",
+        model="NAM CONUS Nest 3km",
+        run_hour="12z",
+    )
+
+    print(f"Writing {OUTFILE}")
+    out.to_netcdf(OUTFILE)
+
+    print("✅ DONE")
+
+if __name__ == "__main__":
+    main()
