@@ -50,7 +50,12 @@ def download_apcp(run_date, fh):
 
     print(f"Downloading {fname}")
 
-    r = requests.get(BASE_CGI, params=params, headers=HEADERS, timeout=120)
+    r = requests.get(
+        BASE_CGI,
+        params=params,
+        headers=HEADERS,
+        timeout=120,
+    )
     r.raise_for_status()
     outpath.write_bytes(r.content)
 
@@ -59,7 +64,7 @@ def download_apcp(run_date, fh):
 
 def main():
     run_date = datetime.utcnow().strftime("%Y%m%d")
-    datasets = []
+    arrays = []
 
     for fh in range(START_FH, END_FH + 1):
         grib = download_apcp(run_date, fh)
@@ -70,11 +75,10 @@ def main():
             backend_kwargs={"indexpath": ""},
         )
 
-        # APCP in NAM is total precip for the interval ending at fh
-        datasets.append(ds["tp"])
+        arrays.append(ds["tp"])
 
     print("Summing APCP f12–f24")
-    total = sum(datasets)
+    total = sum(arrays)
 
     out = total.to_dataset(name="apcp_12_24")
     out["apcp_12_24"].attrs.update(
@@ -94,6 +98,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
