@@ -29,9 +29,10 @@ CAPE_COD_BBOX = {
 
 PARAMS = ["2t", "10u", "10v", "msl", "tp"]
 DEFAULT_STEP = 24
-DEFAULT_SOURCE = "aws"
+DEFAULT_SOURCE = "auto"
 DEFAULT_GRIB = "work/ecmwf_cape_cod_latest.grib2"
 DEFAULT_PNG = "ecmwf_cape_cod_latest.png"
+SOURCE_FALLBACKS = ["ecmwf", "google", "aws"]
 
 
 def parse_args() -> argparse.Namespace:
@@ -49,8 +50,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--source",
         default=DEFAULT_SOURCE,
-        choices=["ecmwf", "aws", "azure", "google"],
-        help="ECMWF open-data source.",
+        choices=["auto", "ecmwf", "aws", "azure", "google"],
+        help="ECMWF open-data source. Use auto to try mirrors until one works.",
     )
     parser.add_argument("--grib", default=DEFAULT_GRIB, help="Downloaded GRIB2 path.")
     parser.add_argument("--output", default=DEFAULT_PNG, help="Output PNG path.")
@@ -79,11 +80,26 @@ def download_grib(args: argparse.Namespace) -> object | None:
     if args.time is not None:
         request["time"] = args.time
 
-    print(f"Downloading ECMWF open data to {target}")
-    client = Client(source=args.source, model="ifs")
-    result = client.retrieve(**request)
-    print(f"Retrieved run: {getattr(result, 'datetime', 'latest available')}")
-    return result
+    sources = SOURCE_FALLBACKS if args.source == "auto" else [args.source]
+    last_error = None
+
+    for source in sources:
+        if target.exists():
+            target.unlink()
+
+        print(f"Downloading ECMWF open data from {source} to {target}")
+        client = Client(source=source, model="ifs")
+        try:
+            result = client.retrieve(**request)
+        except Exception as exc:
+            last_error = exc
+            print(f"Download from {source} failed: {exc}")
+            continue
+
+        print(f"Retrieved run: {getattr(result, 'datetime', 'latest available')}")
+        return result
+
+    raise RuntimeError(f"All ECMWF open-data sources failed: {last_error}")
 
 
 def open_fields(grib_path: str) -> dict[str, object]:
