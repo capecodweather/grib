@@ -63,53 +63,63 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def download_grib(args: argparse.Namespace) -> object | None:
+def download_gribs(args: argparse.Namespace) -> list[Path]:
     target = Path(args.grib)
     target.parent.mkdir(parents=True, exist_ok=True)
 
     if args.skip_download and target.exists():
         print(f"Using existing {target}")
-        return None
+        return [target]
 
-    request = {
-        "type": "fc",
-        "step": args.step,
-        "param": PARAMS,
-        "target": str(target),
-    }
-    if args.time is not None:
-        request["time"] = args.time
-
+    downloaded = []
     sources = SOURCE_FALLBACKS if args.source == "auto" else [args.source]
-    last_error = None
 
-    for source in sources:
-        if target.exists():
-            target.unlink()
+    for param in PARAMS:
+        param_target = target.with_name(f"{target.stem}_{param}{target.suffix}")
+        request = {
+            "type": "fc",
+            "step": args.step,
+            "param": param,
+            "target": str(param_target),
+        }
+        if args.time is not None:
+            request["time"] = args.time
 
-        print(f"Downloading ECMWF open data from {source} to {target}")
-        client = Client(source=source, model="ifs")
-        try:
-            result = client.retrieve(**request)
-        except Exception as exc:
-            last_error = exc
-            print(f"Download from {source} failed: {exc}")
-            continue
+        last_error = None
+        for source in sources:
+            if param_target.exists():
+                param_target.unlink()
 
-        print(f"Retrieved run: {getattr(result, 'datetime', 'latest available')}")
-        return result
+            print(f"Downloading ECMWF {param} from {source} to {param_target}")
+            client = Client(source=source, model="ifs")
+            try:
+                result = client.retrieve(**request)
+            except Exception as exc:
+                last_error = exc
+                print(f"Download of {param} from {source} failed: {exc}")
+                continue
 
-    raise RuntimeError(f"All ECMWF open-data sources failed: {last_error}")
+            print(f"Retrieved {param}: {getattr(result, 'datetime', 'latest available')}")
+            downloaded.append(param_target)
+            break
+        else:
+            raise RuntimeError(f"All ECMWF open-data sources failed for {param}: {last_error}")
+
+    return downloaded
 
 
-def open_fields(grib_path: str) -> dict[str, object]:
-    datasets = cfgrib.open_datasets(
-        grib_path,
-        backend_kwargs={
-            "indexpath": "",
-            "errors": "ignore",
-        },
-    )
+def open_fields(grib_paths: list[Path]) -> dict[str, object]:
+    datasets = []
+    for grib_path in grib_paths:
+        datasets.extend(
+            cfgrib.open_datasets(
+                grib_path,
+                backend_kwargs={
+                    "indexpath": "",
+                    "errors": "ignore",
+                },
+            )
+        )
 
     fields = {}
     for ds in datasets:
@@ -289,8 +299,8 @@ def plot_map(fields: dict[str, object], output: str, step: int) -> None:
 
 def main() -> None:
     args = parse_args()
-    download_grib(args)
-    fields = open_fields(args.grib)
+    grib_paths = download_gribs(args)
+    fields = open_fields(grib_paths)
     plot_map(fields, args.output, args.step)
 
 
