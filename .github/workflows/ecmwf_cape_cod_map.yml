@@ -15,7 +15,7 @@ on:
       source:
         description: ECMWF open-data mirror
         required: true
-        default: auto
+        default: google
   schedule:
     - cron: "30 10 * * *"
 
@@ -44,7 +44,7 @@ jobs:
 
       - name: Run ECMWF Cape Cod map
         run: |
-          python ecmwf_cape_cod_map.py --step "${{ github.event.inputs.step || '24' }}" --source "${{ github.event.inputs.source || 'auto' }}"
+          python ecmwf_cape_cod_map.py --step "${{ github.event.inputs.step || '24' }}" --source "${{ github.event.inputs.source || 'google' }}"
 
       - name: Upload map
         uses: actions/upload-artifact@v4
