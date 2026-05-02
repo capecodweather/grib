@@ -29,10 +29,10 @@ CAPE_COD_BBOX = {
 
 PARAMS = ["2t", "10u", "10v", "msl", "tp"]
 DEFAULT_STEP = 24
-DEFAULT_SOURCE = "auto"
+DEFAULT_SOURCE = "google"
 DEFAULT_GRIB = "work/ecmwf_cape_cod_latest.grib2"
 DEFAULT_PNG = "ecmwf_cape_cod_latest.png"
-SOURCE_FALLBACKS = ["ecmwf", "google", "aws"]
+SOURCE_FALLBACKS = ["google", "ecmwf", "azure"]
 
 
 def parse_args() -> argparse.Namespace:
@@ -50,7 +50,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--source",
         default=DEFAULT_SOURCE,
-        choices=["auto", "ecmwf", "aws", "azure", "google"],
+        choices=["auto", "ecmwf", "azure", "google"],
         help="ECMWF open-data source. Use auto to try mirrors until one works.",
     )
     parser.add_argument("--grib", default=DEFAULT_GRIB, help="Downloaded GRIB2 path.")
