@@ -1,0 +1,48 @@
+name: ECMWF Cape Cod Map
+
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: Forecast hour
+        required: true
+        default: "24"
+      source:
+        description: ECMWF open-data mirror
+        required: true
+        default: aws
+  schedule:
+    - cron: "30 10 * * *"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libeccodes0
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-ecmwf-map.txt
+
+      - name: Run ECMWF Cape Cod map
+        run: |
+          python ecmwf_cape_cod_map.py --step "${{ github.event.inputs.step || '24' }}" --source "${{ github.event.inputs.source || 'aws' }}"
+
+      - name: Upload map
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecmwf_cape_cod_map
+          path: ecmwf_cape_cod_latest.png
