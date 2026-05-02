@@ -1,6 +1,11 @@
 name: ECMWF Cape Cod Map
 
 on:
+  pull_request:
+    paths:
+      - ecmwf_cape_cod_map.py
+      - requirements-ecmwf-map.txt
+      - .github/workflows/ecmwf_cape_cod_map.yml
   workflow_dispatch:
     inputs:
       step:
